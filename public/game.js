@@ -142,18 +142,34 @@ respawnButton.addEventListener('click', () => {
   respawnButton.style.display = 'none';
 });
 
-// Desenha a seta
-function drawArrow(context, fromX, fromY, toX, toY) {
-  const headlen = 10; // Tamanho da cabeça da seta
-  const angle = Math.atan2(toY - fromY, toX - fromX);
+// Desenha a seta que aponta para a posição do mouse
+function drawPointer(context, player) {
+  const arrowLength = 15; // Comprimento da seta
+  const headLength = 5; // Comprimento da cabeça da seta
+  const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+
+  // Ponto inicial da seta
+  const fromX = player.x;
+  const fromY = player.y;
+
+  // Ponto final da seta
+  const toX = fromX + arrowLength * Math.cos(angle);
+  const toY = fromY + arrowLength * Math.sin(angle);
+
+  // Desenha a linha da seta
   context.beginPath();
   context.moveTo(fromX, fromY);
   context.lineTo(toX, toY);
-  context.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
-  context.moveTo(toX, toY);
-  context.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
   context.strokeStyle = 'blue'; // Cor da seta
   context.lineWidth = 2; // Espessura da linha
+  context.stroke();
+
+  // Cabeça da seta
+  context.beginPath();
+  context.moveTo(toX, toY);
+  context.lineTo(toX - headLength * Math.cos(angle - Math.PI / 6), toY - headLength * Math.sin(angle - Math.PI / 6));
+  context.moveTo(toX, toY);
+  context.lineTo(toX - headLength * Math.cos(angle + Math.PI / 6), toY - headLength * Math.sin(angle + Math.PI / 6));
   context.stroke();
 }
 
@@ -207,8 +223,10 @@ function gameLoop() {
     context.fillStyle = 'red';
     context.fillText(player.health, player.x - 10, player.y - 15); // Renderiza a saúde acima do jogador
 
-    // Desenha a seta apontando para a posição do mouse
-    drawArrow(context, player.x, player.y, mouseX, mouseY);
+    // Desenha a seta de direção apenas para o jogador controlado
+    if (id === socket.id) {
+      drawPointer(context, player);
+    }
   }
 
   // Renderiza as balas
