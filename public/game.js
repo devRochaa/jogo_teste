@@ -7,29 +7,26 @@ const mapHeight = canvas.height;
 
 let players = {};
 let bullets = [];
+const playerSpeed = 5;
 
 const respawnButton = document.getElementById('respawnButton');
 
 socket.on('currentPlayers', (currentPlayers) => {
   players = currentPlayers;
-  console.log('Current Players:', players); // Log dos jogadores atuais
 });
 
 socket.on('newPlayer', (data) => {
   players[data.playerId] = data.playerInfo;
-  console.log('New Player:', data); // Log de novo jogador
 });
 
 socket.on('playerMoved', (data) => {
   if (players[data.playerId]) {
     players[data.playerId] = data.playerInfo;
-    console.log('Player Moved:', data); // Log de movimento de jogador
   }
 });
 
 socket.on('disconnect', (playerId) => {
   delete players[playerId];
-  console.log('Player Disconnected:', playerId); // Log de desconexão
 });
 
 socket.on('currentBullets', (currentBullets) => {
@@ -41,9 +38,9 @@ socket.on('newBullet', (bulletData) => {
 });
 
 socket.on('bulletHit', (data) => {
-  bullets.splice(data.bulletIndex, 1); // Remove a bala atingida
+  bullets.splice(data.bulletIndex, 1);
   if (players[data.playerId]) {
-    players[data.playerId].health = data.health; // Atualiza a saúde do jogador atingido
+    players[data.playerId].health = data.health;
   }
 });
 
@@ -51,9 +48,9 @@ socket.on('playerDied', (playerId) => {
   if (playerId === socket.id) {
     setTimeout(() => {
       respawnButton.style.display = 'block';
-    }, 3000); // Mostra o botão de renascer após 3 segundos
+    }, 3000);
   }
-  delete players[playerId]; // Remove o jogador morto
+  delete players[playerId];
 });
 
 socket.on('updateBullets', (updatedBullets) => {
@@ -64,6 +61,7 @@ let moveUp = false;
 let moveDown = false;
 let moveLeft = false;
 let moveRight = false;
+let lastPosition = { x: 0, y: 0 };
 
 document.addEventListener('keydown', (event) => {
   switch (event.key) {
@@ -122,32 +120,35 @@ respawnButton.addEventListener('click', () => {
   respawnButton.style.display = 'none';
 });
 
-let lastPosition = { x: 0, y: 0 }; // Armazena a última posição do jogador
-
 function gameLoop() {
-  if (players[socket.id]) { // Verifica se o jogador existe antes de movimentar
-    // Atualiza a posição do jogador com base nas teclas pressionadas
+  if (players[socket.id]) {
+    let moved = false; // Flag para verificar se o jogador se moveu
+
+    // Atualiza a posição do jogador
     if (moveUp) {
-      players[socket.id].y -= 5;
+      players[socket.id].y -= playerSpeed;
+      moved = true;
     }
     if (moveDown) {
-      players[socket.id].y += 5;
+      players[socket.id].y += playerSpeed;
+      moved = true;
     }
     if (moveLeft) {
-      players[socket.id].x -= 5;
+      players[socket.id].x -= playerSpeed;
+      moved = true;
     }
     if (moveRight) {
-      players[socket.id].x += 5;
+      players[socket.id].x += playerSpeed;
+      moved = true;
     }
 
     // Limita o movimento dentro dos limites do mapa
-    players[socket.id].x = Math.max(10, Math.min(players[socket.id].x, mapWidth - 10)); // Ajusta o limite
-    players[socket.id].y = Math.max(10, Math.min(players[socket.id].y, mapHeight - 10)); // Ajusta o limite
+    players[socket.id].x = Math.max(10, Math.min(players[socket.id].x, mapWidth - 10));
+    players[socket.id].y = Math.max(10, Math.min(players[socket.id].y, mapHeight - 10));
 
-    // Envia a nova posição para o servidor apenas se ela mudar
-    if (players[socket.id].x !== lastPosition.x || players[socket.id].y !== lastPosition.y) {
+    // Envia a nova posição para o servidor apenas se o jogador se moveu
+    if (moved && (players[socket.id].x !== lastPosition.x || players[socket.id].y !== lastPosition.y)) {
       socket.emit('playerMovement', players[socket.id]);
-      console.log('Player Movement Sent:', players[socket.id]); // Log de movimento enviado
       lastPosition = { x: players[socket.id].x, y: players[socket.id].y }; // Atualiza a última posição
     }
   }
