@@ -1,203 +1,132 @@
-const socket = io();
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
 
-const canvas = document.getElementById('gameCanvas');
-const context = canvas.getContext('2d');
-const mapWidth = canvas.width;
-const mapHeight = canvas.height;
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
 
-let players = {};
+app.use(express.static('public'));
+
+const players = {};
 let bullets = [];
-const playerSpeed = 5;
-const playerRadius = 15; // Aumentar o raio do jogador
+const bulletSpeed = 10;
+const bulletLifetime = 100; // Número de frames que a bala dura
+const playerRadius = 10;
+const bulletRadius = 5;
 
-const respawnButton = document.getElementById('respawnButton');
+const mapWidth = 800;  // Largura do mapa
+const mapHeight = 600; // Altura do mapa
 
-// Recebe a lista de jogadores atuais
-socket.on('currentPlayers', (currentPlayers) => {
-  players = currentPlayers;
-});
+io.on('connection', (socket) => {
+  console.log(`Novo jogador conectado: ${socket.id}`);
 
-// Recebe informações sobre um novo jogador
-socket.on('newPlayer', (data) => {
-  players[data.playerId] = data.playerInfo;
-});
-
-// Atualiza a posição do jogador quando recebe do servidor
-socket.on('playerMoved', (data) => {
-  // Não atualiza a posição do jogador local se for o próprio jogador
-  if (data.playerId !== socket.id && players[data.playerId]) {
-    players[data.playerId].x = data.playerInfo.x;
-    players[data.playerId].y = data.playerInfo.y;
-    players[data.playerId].health = data.playerInfo.health;
-  }
-});
-
-// Remove um jogador desconectado
-socket.on('disconnect', (playerId) => {
-  delete players[playerId];
-});
-
-// Recebe a lista de balas atuais
-socket.on('currentBullets', (currentBullets) => {
-  bullets = currentBullets;
-});
-
-// Adiciona uma nova bala ao jogo
-socket.on('newBullet', (bulletData) => {
-  bullets.push(bulletData);
-});
-
-// Atualiza a saúde do jogador quando atingido
-socket.on('bulletHit', (data) => {
-  bullets.splice(data.bulletIndex, 1);
-  if (players[data.playerId]) {
-    players[data.playerId].health = data.health;
-  }
-});
-
-// Remove um jogador que morreu
-socket.on('playerDied', (playerId) => {
-  if (playerId === socket.id) {
-    setTimeout(() => {
-      respawnButton.style.display = 'block';
-    }, 3000);
-  }
-  delete players[playerId];
-});
-
-// Atualiza a lista de balas
-socket.on('updateBullets', (updatedBullets) => {
-  bullets = updatedBullets;
-});
-
-// Flags de movimento
-let moveUp = false;
-let moveDown = false;
-let moveLeft = false;
-let moveRight = false;
-let lastPosition = { x: 0, y: 0 };
-
-// Controla as teclas pressionadas
-document.addEventListener('keydown', (event) => {
-  switch (event.key) {
-    case 'w':
-      moveUp = true;
-      break;
-    case 'a':
-      moveLeft = true;
-      break;
-    case 's':
-      moveDown = true;
-      break;
-    case 'd':
-      moveRight = true;
-      break;
-  }
-});
-
-// Controla as teclas soltas
-document.addEventListener('keyup', (event) => {
-  switch (event.key) {
-    case 'w':
-      moveUp = false;
-      break;
-    case 'a':
-      moveLeft = false;
-      break;
-    case 's':
-      moveDown = false;
-      break;
-    case 'd':
-      moveRight = false;
-      break;
-  }
-});
-
-// Atira uma bala quando o mouse é clicado
-document.addEventListener('click', (event) => {
-  if (players[socket.id]) {
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-    const angle = Math.atan2(mouseY - players[socket.id].y, mouseX - players[socket.id].x);
-    const bullet = {
-      x: players[socket.id].x, // A posição atual do jogador
-      y: players[socket.id].y,
-      angle: angle,
-      speed: 10,
-      ownerId: socket.id
+  function addNewPlayer() {
+    players[socket.id] = {
+      x: Math.random() * mapWidth,
+      y: Math.random() * mapHeight,
+      angle: 0,
+      health: 100
     };
-    bullets.push(bullet);
-    socket.emit('shootBullet', bullet); // Enviar a nova bala ao servidor
-  }
-});
-
-// Renasce o jogador
-respawnButton.addEventListener('click', () => {
-  socket.emit('respawn');
-  respawnButton.style.display = 'none';
-});
-
-// Loop principal do jogo
-function gameLoop() {
-  if (players[socket.id]) {
-    let moved = false;
-
-    // Atualiza a posição do jogador
-    if (moveUp) {
-      players[socket.id].y -= playerSpeed;
-      moved = true;
-    }
-    if (moveDown) {
-      players[socket.id].y += playerSpeed;
-      moved = true;
-    }
-    if (moveLeft) {
-      players[socket.id].x -= playerSpeed;
-      moved = true;
-    }
-    if (moveRight) {
-      players[socket.id].x += playerSpeed;
-      moved = true;
-    }
-
-    // Limita o movimento dentro dos limites do mapa
-    players[socket.id].x = Math.max(playerRadius, Math.min(players[socket.id].x, mapWidth - playerRadius));
-    players[socket.id].y = Math.max(playerRadius, Math.min(players[socket.id].y, mapHeight - playerRadius));
-
-    // Envia a nova posição para o servidor apenas se o jogador se moveu
-    if (moved && (players[socket.id].x !== lastPosition.x || players[socket.id].y !== lastPosition.y)) {
-      socket.emit('playerMovement', { 
-        x: players[socket.id].x, 
-        y: players[socket.id].y, 
-        health: players[socket.id].health 
-      });
-      lastPosition = { x: players[socket.id].x, y: players[socket.id].y }; 
-    }
   }
 
-  context.clearRect(0, 0, canvas.width, canvas.height);
+  // Adiciona novo jogador
+  addNewPlayer();
 
-  // Renderiza os jogadores
-  for (let id in players) {
-    const player = players[id];
-    context.fillStyle = 'black';
-    context.beginPath();
-    context.arc(player.x, player.y, playerRadius, 0, 2 * Math.PI); // Usar playerRadius para o tamanho da seta
-    context.fill();
-    context.fillStyle = 'red';
-    context.fillText(player.health, player.x - 10, player.y - 20); // Renderiza a saúde acima do jogador
-  }
+  socket.emit('currentPlayers', players);
+  socket.emit('currentBullets', bullets);
+  socket.broadcast.emit('newPlayer', { playerId: socket.id, playerInfo: players[socket.id] });
 
-  // Renderiza as balas
-  bullets.forEach(bullet => {
-    context.fillStyle = 'red';
-    context.beginPath();
-    context.arc(bullet.x, bullet.y, 5, 0, 2 * Math.PI);
-    context.fill();
+  // Movimento do jogador
+  socket.on('playerMovement', (movementData) => {
+    if (players[socket.id]) { // Verifica se o jogador ainda existe
+      players[socket.id].x = movementData.x;
+      players[socket.id].y = movementData.y;
+      players[socket.id].angle = movementData.angle; // Atualiza o ângulo
+      io.emit('playerMoved', { playerId: socket.id, playerInfo: players[socket.id] });
+    }
   });
 
-  requestAnimationFrame(gameLoop);
+  // Disparo de projétil
+  socket.on('shootBullet', () => {
+    const player = players[socket.id];
+    if (player) {
+      const bullet = {
+        x: player.x, // Posição inicial da bala
+        y: player.y,
+        angle: player.angle, // Ângulo do jogador
+        ownerId: socket.id,
+        lifetime: bulletLifetime
+      };
+
+      bullets.push(bullet); // Adiciona a bala ao servidor
+      io.emit('newBullet', bullet); // Emite a nova bala para todos os clientes
+    }
+  });
+
+  // Desconectar
+  socket.on('disconnect', () => {
+    console.log(`Jogador desconectado: ${socket.id}`);
+    delete players[socket.id];
+    io.emit('disconnect', socket.id);
+  });
+
+  // Renascer jogador
+  socket.on('respawn', () => {
+    addNewPlayer();
+    io.emit('newPlayer', { playerId: socket.id, playerInfo: players[socket.id] });
+  });
+});
+
+function gameLoop() {
+  // Atualiza a posição das balas
+  bullets.forEach(bullet => {
+    bullet.x += bulletSpeed * Math.cos(bullet.angle);
+    bullet.y += bulletSpeed * Math.sin(bullet.angle);
+    bullet.lifetime--;
+  });
+
+  // Verifica colisões entre balas e jogadores
+  bullets.forEach((bullet, bulletIndex) => {
+    for (let playerId in players) {
+      if (bullet.ownerId === playerId) continue; // Ignora colisão com o jogador que disparou
+
+      const player = players[playerId];
+      const dx = bullet.x - player.x;
+      const dy = bullet.y - player.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < playerRadius + bulletRadius) {
+        player.health -= 20; // Reduz a saúde do jogador atingido
+        bullets.splice(bulletIndex, 1); // Remove a bala após a colisão
+        io.emit('bulletHit', { bulletIndex, playerId, health: player.health });
+
+        if (player.health <= 0) {
+          io.emit('playerDied', playerId);
+          delete players[playerId];
+        }
+
+        break; // Saia do loop assim que a colisão for detectada
+      }
+    }
+  });
+
+  // Remove balas que estão fora da tela ou atingiram o tempo de vida
+  bullets = bullets.filter(bullet =>
+    bullet.x >= 0 && bullet.x <= mapWidth &&
+    bullet.y >= 0 && bullet.y <= mapHeight &&
+    bullet.lifetime > 0
+  );
+
+  // Atualiza a lista de balas no cliente
+  io.emit('updateBullets', bullets);
 }
 
-gameLoop();
+// Configura o loop do jogo para rodar a 60 FPS
+setInterval(gameLoop, 1000 / 60); 
+
+// Usa a variável de ambiente PORT se estiver disponível, caso contrário, usa 3000
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Servidor ouvindo na porta ${PORT}`);
+});
