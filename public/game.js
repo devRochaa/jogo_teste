@@ -11,14 +11,17 @@ const playerSpeed = 5;
 
 const respawnButton = document.getElementById('respawnButton');
 
+// Recebe a lista de jogadores atuais
 socket.on('currentPlayers', (currentPlayers) => {
   players = currentPlayers;
 });
 
+// Recebe informações sobre um novo jogador
 socket.on('newPlayer', (data) => {
   players[data.playerId] = data.playerInfo;
 });
 
+// Atualiza a posição do jogador quando recebe do servidor
 socket.on('playerMoved', (data) => {
   if (players[data.playerId]) {
     players[data.playerId].x = data.playerInfo.x;
@@ -27,18 +30,22 @@ socket.on('playerMoved', (data) => {
   }
 });
 
+// Remove um jogador desconectado
 socket.on('disconnect', (playerId) => {
   delete players[playerId];
 });
 
+// Recebe a lista de balas atuais
 socket.on('currentBullets', (currentBullets) => {
   bullets = currentBullets;
 });
 
+// Adiciona uma nova bala ao jogo
 socket.on('newBullet', (bulletData) => {
   bullets.push(bulletData);
 });
 
+// Atualiza a saúde do jogador quando atingido
 socket.on('bulletHit', (data) => {
   bullets.splice(data.bulletIndex, 1);
   if (players[data.playerId]) {
@@ -46,6 +53,7 @@ socket.on('bulletHit', (data) => {
   }
 });
 
+// Remove um jogador que morreu
 socket.on('playerDied', (playerId) => {
   if (playerId === socket.id) {
     setTimeout(() => {
@@ -55,16 +63,19 @@ socket.on('playerDied', (playerId) => {
   delete players[playerId];
 });
 
+// Atualiza a lista de balas
 socket.on('updateBullets', (updatedBullets) => {
   bullets = updatedBullets;
 });
 
+// Flags de movimento
 let moveUp = false;
 let moveDown = false;
 let moveLeft = false;
 let moveRight = false;
 let lastPosition = { x: 0, y: 0 };
 
+// Controla as teclas pressionadas
 document.addEventListener('keydown', (event) => {
   switch (event.key) {
     case 'w':
@@ -82,6 +93,7 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
+// Controla as teclas soltas
 document.addEventListener('keyup', (event) => {
   switch (event.key) {
     case 'w':
@@ -99,6 +111,7 @@ document.addEventListener('keyup', (event) => {
   }
 });
 
+// Atira uma bala quando o mouse é clicado
 document.addEventListener('click', (event) => {
   if (players[socket.id]) {
     const rect = canvas.getBoundingClientRect();
@@ -117,14 +130,16 @@ document.addEventListener('click', (event) => {
   }
 });
 
+// Renasce o jogador
 respawnButton.addEventListener('click', () => {
   socket.emit('respawn');
   respawnButton.style.display = 'none';
 });
 
+// Loop principal do jogo
 function gameLoop() {
   if (players[socket.id]) {
-    let moved = false; // Flag para verificar se o jogador se moveu
+    let moved = false;
 
     // Atualiza a posição do jogador
     if (moveUp) {
@@ -150,8 +165,12 @@ function gameLoop() {
 
     // Envia a nova posição para o servidor apenas se o jogador se moveu
     if (moved && (players[socket.id].x !== lastPosition.x || players[socket.id].y !== lastPosition.y)) {
-      socket.emit('playerMovement', players[socket.id]);
-      lastPosition = { x: players[socket.id].x, y: players[socket.id].y }; // Atualiza a última posição
+      socket.emit('playerMovement', { 
+        x: players[socket.id].x, 
+        y: players[socket.id].y, 
+        health: players[socket.id].health 
+      });
+      lastPosition = { x: players[socket.id].x, y: players[socket.id].y }; 
     }
   }
 
