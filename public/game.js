@@ -120,6 +120,7 @@ respawnButton.addEventListener('click', () => {
 
 function gameLoop() {
   if (players[socket.id]) { // Verifica se o jogador existe antes de movimentar
+    // Atualiza a posição do jogador com base nas teclas pressionadas
     if (moveUp) {
       players[socket.id].y -= 5;
     }
@@ -134,9 +135,10 @@ function gameLoop() {
     }
 
     // Limita o movimento dentro dos limites do mapa
-    players[socket.id].x = Math.max(0, Math.min(players[socket.id].x, mapWidth));
-    players[socket.id].y = Math.max(0, Math.min(players[socket.id].y, mapHeight));
+    players[socket.id].x = Math.max(10, Math.min(players[socket.id].x, mapWidth - 10)); // Ajusta o limite
+    players[socket.id].y = Math.max(10, Math.min(players[socket.id].y, mapHeight - 10)); // Ajusta o limite
 
+    // Envia a nova posição para o servidor
     socket.emit('playerMovement', players[socket.id]);
   }
 
