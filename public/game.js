@@ -74,23 +74,26 @@ let moveDown = false;
 let moveLeft = false;
 let moveRight = false;
 let lastPosition = { x: 0, y: 0 };
-let mouseX = 0;
-let mouseY = 0;
+let shootingDirection = { x: 0, y: 0 };
 
 // Controla as teclas pressionadas
 document.addEventListener('keydown', (event) => {
   switch (event.key) {
     case 'w':
       moveUp = true;
+      shootingDirection.y = -1; // Mira para cima
       break;
     case 'a':
       moveLeft = true;
+      shootingDirection.x = -1; // Mira para a esquerda
       break;
     case 's':
       moveDown = true;
+      shootingDirection.y = 1; // Mira para baixo
       break;
     case 'd':
       moveRight = true;
+      shootingDirection.x = 1; // Mira para a direita
       break;
   }
 });
@@ -100,34 +103,30 @@ document.addEventListener('keyup', (event) => {
   switch (event.key) {
     case 'w':
       moveUp = false;
+      if (shootingDirection.y === -1) shootingDirection.y = 0; // Reseta a direção se não estiver mais movendo
       break;
     case 'a':
       moveLeft = false;
+      if (shootingDirection.x === -1) shootingDirection.x = 0; // Reseta a direção se não estiver mais movendo
       break;
     case 's':
       moveDown = false;
+      if (shootingDirection.y === 1) shootingDirection.y = 0; // Reseta a direção se não estiver mais movendo
       break;
     case 'd':
       moveRight = false;
+      if (shootingDirection.x === 1) shootingDirection.x = 0; // Reseta a direção se não estiver mais movendo
       break;
   }
-});
-
-// Atualiza a posição do mouse
-document.addEventListener('mousemove', (event) => {
-  const rect = canvas.getBoundingClientRect();
-  mouseX = event.clientX - rect.left;
-  mouseY = event.clientY - rect.top;
 });
 
 // Atira uma bala quando o mouse é clicado
 document.addEventListener('click', (event) => {
   if (players[socket.id]) {
-    const angle = Math.atan2(mouseY - players[socket.id].y, mouseX - players[socket.id].x);
     const bullet = {
       x: players[socket.id].x,
       y: players[socket.id].y,
-      angle: angle,
+      angle: Math.atan2(shootingDirection.y, shootingDirection.x),
       speed: 10,
       ownerId: socket.id
     };
@@ -141,11 +140,11 @@ respawnButton.addEventListener('click', () => {
   respawnButton.style.display = 'none';
 });
 
-// Desenha a seta que aponta para a posição do mouse
+// Desenha a seta que aponta para a direção do movimento
 function drawPointer(context, player) {
   const arrowLength = 15; // Comprimento da seta
   const headLength = 5; // Comprimento da cabeça da seta
-  const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+  const angle = Math.atan2(shootingDirection.y, shootingDirection.x);
 
   // Ponto inicial da seta
   const fromX = player.x;
