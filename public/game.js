@@ -11,32 +11,39 @@ const smoothing = 0.1; // Fator de suavização para a interpolação
 
 const respawnButton = document.getElementById('respawnButton');
 
+// Recebe a lista de jogadores atuais do servidor
 socket.on('currentPlayers', (currentPlayers) => {
   players = currentPlayers;
 });
 
+// Adiciona um novo jogador
 socket.on('newPlayer', (data) => {
   players[data.playerId] = { ...data.playerInfo, target: { ...data.playerInfo } };
 });
 
+// Atualiza a posição de um jogador
 socket.on('playerMoved', (data) => {
   if (players[data.playerId]) {
     players[data.playerId].target = { ...data.playerInfo }; // Atualiza a posição alvo
   }
 });
 
+// Remove um jogador desconectado
 socket.on('disconnect', (playerId) => {
   delete players[playerId];
 });
 
+// Recebe as balas atuais do servidor
 socket.on('currentBullets', (currentBullets) => {
   bullets = currentBullets;
 });
 
+// Adiciona uma nova bala
 socket.on('newBullet', (bulletData) => {
   bullets.push(bulletData);
 });
 
+// Atualiza a saúde de um jogador após ser atingido
 socket.on('bulletHit', (data) => {
   bullets.splice(data.bulletIndex, 1); // Remove a bala atingida
   if (players[data.playerId]) {
@@ -44,6 +51,7 @@ socket.on('bulletHit', (data) => {
   }
 });
 
+// Remove um jogador que morreu
 socket.on('playerDied', (playerId) => {
   if (playerId === socket.id) {
     setTimeout(() => {
@@ -53,6 +61,7 @@ socket.on('playerDied', (playerId) => {
   delete players[playerId]; // Remove o jogador morto
 });
 
+// Atualiza a lista de balas
 socket.on('updateBullets', (updatedBullets) => {
   bullets = updatedBullets;
 });
@@ -97,6 +106,7 @@ document.addEventListener('keyup', (event) => {
   }
 });
 
+// Disparo de balas ao clicar
 document.addEventListener('click', (event) => {
   if (players[socket.id]) {
     const rect = canvas.getBoundingClientRect();
@@ -117,6 +127,7 @@ document.addEventListener('click', (event) => {
   }
 });
 
+// Evento de renascimento
 respawnButton.addEventListener('click', () => {
   socket.emit('respawn');
   respawnButton.style.display = 'none';
@@ -152,7 +163,7 @@ function gameLoop() {
     socket.emit('playerMovement', player); // Envia a posição atualizada para o servidor
   }
 
-  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.clearRect(0, 0, canvas.width, canvas.height); // Limpa o canvas
 
   // Renderiza os jogadores
   for (let id in players) {
