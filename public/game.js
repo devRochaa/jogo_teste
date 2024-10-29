@@ -21,7 +21,9 @@ socket.on('newPlayer', (data) => {
 
 socket.on('playerMoved', (data) => {
   if (players[data.playerId]) {
-    players[data.playerId] = data.playerInfo;
+    players[data.playerId].x = data.playerInfo.x;
+    players[data.playerId].y = data.playerInfo.y;
+    players[data.playerId].health = data.playerInfo.health;
   }
 });
 
