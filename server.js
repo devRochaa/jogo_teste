@@ -19,9 +19,9 @@ const mapWidth = 800;  // Largura do mapa
 const mapHeight = 600; // Altura do mapa
 
 io.on('connection', (socket) => {
-  console.log(`Novo jogador conectado: ${socket.id}`);
+  console.log(New player connected: ${socket.id});
 
-  function addNewPlayer() {
+  function addNewPlayer(socket) {
     players[socket.id] = {
       x: Math.random() * mapWidth,
       y: Math.random() * mapHeight,
@@ -31,7 +31,7 @@ io.on('connection', (socket) => {
   }
 
   // Adiciona novo jogador
-  addNewPlayer();
+  addNewPlayer(socket);
 
   socket.emit('currentPlayers', players);
   socket.emit('currentBullets', bullets);
@@ -42,38 +42,31 @@ io.on('connection', (socket) => {
     if (players[socket.id]) { // Verifica se o jogador ainda existe
       players[socket.id].x = movementData.x;
       players[socket.id].y = movementData.y;
-      players[socket.id].angle = movementData.angle; // Atualiza o ângulo
+      players[socket.id].angle = movementData.angle;
       io.emit('playerMoved', { playerId: socket.id, playerInfo: players[socket.id] });
     }
   });
 
   // Disparo de projétil
-  socket.on('shootBullet', () => {
-    const player = players[socket.id];
-    if (player) {
-      const bullet = {
-        x: player.x, // Posição inicial da bala
-        y: player.y,
-        angle: player.angle, // Ângulo do jogador
-        ownerId: socket.id,
-        lifetime: bulletLifetime
-      };
-
-      bullets.push(bullet); // Adiciona a bala ao servidor
-      io.emit('newBullet', bullet); // Emite a nova bala para todos os clientes
-    }
+  socket.on('shootBullet', (bulletData) => {
+    bullets.push({
+      ...bulletData,
+      ownerId: socket.id,
+      lifetime: bulletLifetime
+    });
+    io.emit('newBullet', bulletData);
   });
 
   // Desconectar
   socket.on('disconnect', () => {
-    console.log(`Jogador desconectado: ${socket.id}`);
+    console.log(Player disconnected: ${socket.id});
     delete players[socket.id];
     io.emit('disconnect', socket.id);
   });
 
   // Renascer jogador
   socket.on('respawn', () => {
-    addNewPlayer();
+    addNewPlayer(socket);
     io.emit('newPlayer', { playerId: socket.id, playerInfo: players[socket.id] });
   });
 });
@@ -106,7 +99,7 @@ function gameLoop() {
           delete players[playerId];
         }
 
-        break; // Saia do loop assim que a colisão for detectada
+        break;
       }
     }
   });
@@ -118,15 +111,13 @@ function gameLoop() {
     bullet.lifetime > 0
   );
 
-  // Atualiza a lista de balas no cliente
   io.emit('updateBullets', bullets);
 }
 
-// Configura o loop do jogo para rodar a 60 FPS
-setInterval(gameLoop, 1000 / 60); 
+setInterval(gameLoop, 1000 / 60); // Executa o loop do jogo a 60 FPS
 
-// Usa a variável de ambiente PORT se estiver disponível, caso contrário, usa 3000
+// Altere esta parte para usar a variável de ambiente PORT
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Servidor ouvindo na porta ${PORT}`);
+  console.log(Listening on port ${PORT});
 });
