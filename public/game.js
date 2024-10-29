@@ -23,7 +23,8 @@ socket.on('newPlayer', (data) => {
 
 // Atualiza a posição do jogador quando recebe do servidor
 socket.on('playerMoved', (data) => {
-  if (players[data.playerId]) {
+  // Não atualiza a posição do jogador local se for o próprio jogador
+  if (data.playerId !== socket.id && players[data.playerId]) {
     players[data.playerId].x = data.playerInfo.x;
     players[data.playerId].y = data.playerInfo.y;
     players[data.playerId].health = data.playerInfo.health;
