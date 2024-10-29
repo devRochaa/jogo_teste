@@ -21,7 +21,6 @@ const mapHeight = 600; // Altura do mapa
 io.on('connection', (socket) => {
   console.log(`Novo jogador conectado: ${socket.id}`);
 
-  // Adiciona novo jogador
   function addNewPlayer() {
     players[socket.id] = {
       x: Math.random() * mapWidth,
@@ -31,13 +30,11 @@ io.on('connection', (socket) => {
     };
   }
 
+  // Adiciona novo jogador
   addNewPlayer();
 
-  // Envia os jogadores e balas atuais para o novo jogador
   socket.emit('currentPlayers', players);
   socket.emit('currentBullets', bullets);
-  
-  // Informa aos outros jogadores sobre o novo jogador
   socket.broadcast.emit('newPlayer', { playerId: socket.id, playerInfo: players[socket.id] });
 
   // Movimento do jogador
@@ -55,7 +52,10 @@ io.on('connection', (socket) => {
     const bullet = {
       ...bulletData,
       ownerId: socket.id,
-      lifetime: bulletLifetime
+      lifetime: bulletLifetime,
+      // Adicione a posição inicial da bala
+      x: players[socket.id].x,
+      y: players[socket.id].y,
     };
     bullets.push(bullet); // Adiciona a bala ao servidor
     io.emit('newBullet', bullet); // Emite a nova bala para todos os clientes
@@ -75,7 +75,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// Função principal do jogo
 function gameLoop() {
   // Atualiza a posição das balas
   bullets.forEach(bullet => {
