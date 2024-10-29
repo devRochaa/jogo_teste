@@ -7,6 +7,7 @@ const mapHeight = canvas.height;
 
 let players = {};
 let bullets = [];
+const smoothing = 0.1; // Fator de suavização para a interpolação
 
 const respawnButton = document.getElementById('respawnButton');
 
@@ -15,13 +16,12 @@ socket.on('currentPlayers', (currentPlayers) => {
 });
 
 socket.on('newPlayer', (data) => {
-  players[data.playerId] = data.playerInfo;
+  players[data.playerId] = { ...data.playerInfo, target: { ...data.playerInfo } };
 });
 
 socket.on('playerMoved', (data) => {
   if (players[data.playerId]) {
-    players[data.playerId].x = data.playerInfo.x;
-    players[data.playerId].y = data.playerInfo.y;
+    players[data.playerId].target = { ...data.playerInfo }; // Atualiza a posição alvo
   }
 });
 
@@ -122,35 +122,34 @@ respawnButton.addEventListener('click', () => {
   respawnButton.style.display = 'none';
 });
 
-// Função para atualizar a posição das balas
-function updateBullets() {
-  bullets.forEach(bullet => {
-    bullet.x += bullet.speed * Math.cos(bullet.angle);
-    bullet.y += bullet.speed * Math.sin(bullet.angle);
-  });
-}
-
 // Função principal do jogo
 function gameLoop() {
   if (players[socket.id]) { // Verifica se o jogador existe antes de movimentar
+    const player = players[socket.id];
+
+    // Movimentação local do jogador
     if (moveUp) {
-      players[socket.id].y -= 5;
+      player.target.y -= 5;
     }
     if (moveDown) {
-      players[socket.id].y += 5;
+      player.target.y += 5;
     }
     if (moveLeft) {
-      players[socket.id].x -= 5;
+      player.target.x -= 5;
     }
     if (moveRight) {
-      players[socket.id].x += 5;
+      player.target.x += 5;
     }
 
     // Limita o movimento dentro dos limites do mapa
-    players[socket.id].x = Math.max(10, Math.min(players[socket.id].x, mapWidth - 10));
-    players[socket.id].y = Math.max(10, Math.min(players[socket.id].y, mapHeight - 10));
+    player.target.x = Math.max(10, Math.min(player.target.x, mapWidth - 10));
+    player.target.y = Math.max(10, Math.min(player.target.y, mapHeight - 10));
 
-    socket.emit('playerMovement', players[socket.id]);
+    // Atualiza a posição do jogador com interpolação
+    player.x += (player.target.x - player.x) * smoothing;
+    player.y += (player.target.y - player.y) * smoothing;
+
+    socket.emit('playerMovement', player); // Envia a posição atualizada para o servidor
   }
 
   context.clearRect(0, 0, canvas.width, canvas.height);
@@ -167,8 +166,10 @@ function gameLoop() {
   }
 
   // Atualiza e renderiza as balas
-  updateBullets();
   bullets.forEach(bullet => {
+    bullet.x += bullet.speed * Math.cos(bullet.angle);
+    bullet.y += bullet.speed * Math.sin(bullet.angle);
+    
     context.fillStyle = 'red';
     context.beginPath();
     context.arc(bullet.x, bullet.y, 5, 0, 2 * Math.PI);
