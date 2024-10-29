@@ -122,6 +122,8 @@ respawnButton.addEventListener('click', () => {
   respawnButton.style.display = 'none';
 });
 
+let lastPosition = { x: 0, y: 0 }; // Armazena a última posição do jogador
+
 function gameLoop() {
   if (players[socket.id]) { // Verifica se o jogador existe antes de movimentar
     // Atualiza a posição do jogador com base nas teclas pressionadas
@@ -142,9 +144,12 @@ function gameLoop() {
     players[socket.id].x = Math.max(10, Math.min(players[socket.id].x, mapWidth - 10)); // Ajusta o limite
     players[socket.id].y = Math.max(10, Math.min(players[socket.id].y, mapHeight - 10)); // Ajusta o limite
 
-    // Envia a nova posição para o servidor
-    socket.emit('playerMovement', players[socket.id]);
-    console.log('Player Movement Sent:', players[socket.id]); // Log de movimento enviado
+    // Envia a nova posição para o servidor apenas se ela mudar
+    if (players[socket.id].x !== lastPosition.x || players[socket.id].y !== lastPosition.y) {
+      socket.emit('playerMovement', players[socket.id]);
+      console.log('Player Movement Sent:', players[socket.id]); // Log de movimento enviado
+      lastPosition = { x: players[socket.id].x, y: players[socket.id].y }; // Atualiza a última posição
+    }
   }
 
   context.clearRect(0, 0, canvas.width, canvas.height);
