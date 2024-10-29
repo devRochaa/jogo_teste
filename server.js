@@ -1,123 +1,247 @@
-const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
+const socket = io();
 
-const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
+const canvas = document.getElementById('gameCanvas');
+const context = canvas.getContext('2d');
+const mapWidth = canvas.width;
+const mapHeight = canvas.height;
 
-app.use(express.static('public'));
-
-const players = {};
+let players = {};
 let bullets = [];
-const bulletSpeed = 10;
-const bulletLifetime = 100; // Número de frames que a bala dura
-const playerRadius = 10;
-const bulletRadius = 5;
+const playerSpeed = 5;
 
-const mapWidth = 800;  // Largura do mapa
-const mapHeight = 600; // Altura do mapa
+const respawnButton = document.getElementById('respawnButton');
 
-io.on('connection', (socket) => {
-  console.log(New player connected: ${socket.id});
-
-  function addNewPlayer(socket) {
-    players[socket.id] = {
-      x: Math.random() * mapWidth,
-      y: Math.random() * mapHeight,
-      angle: 0,
-      health: 100
-    };
-  }
-
-  // Adiciona novo jogador
-  addNewPlayer(socket);
-
-  socket.emit('currentPlayers', players);
-  socket.emit('currentBullets', bullets);
-  socket.broadcast.emit('newPlayer', { playerId: socket.id, playerInfo: players[socket.id] });
-
-  // Movimento do jogador
-  socket.on('playerMovement', (movementData) => {
-    if (players[socket.id]) { // Verifica se o jogador ainda existe
-      players[socket.id].x = movementData.x;
-      players[socket.id].y = movementData.y;
-      players[socket.id].angle = movementData.angle;
-      io.emit('playerMoved', { playerId: socket.id, playerInfo: players[socket.id] });
-    }
-  });
-
-  // Disparo de projétil
-  socket.on('shootBullet', (bulletData) => {
-    bullets.push({
-      ...bulletData,
-      ownerId: socket.id,
-      lifetime: bulletLifetime
-    });
-    io.emit('newBullet', bulletData);
-  });
-
-  // Desconectar
-  socket.on('disconnect', () => {
-    console.log(Player disconnected: ${socket.id});
-    delete players[socket.id];
-    io.emit('disconnect', socket.id);
-  });
-
-  // Renascer jogador
-  socket.on('respawn', () => {
-    addNewPlayer(socket);
-    io.emit('newPlayer', { playerId: socket.id, playerInfo: players[socket.id] });
-  });
+// Recebe a lista de jogadores atuais
+socket.on('currentPlayers', (currentPlayers) => {
+  players = currentPlayers;
 });
 
-function gameLoop() {
-  // Atualiza a posição das balas
-  bullets.forEach(bullet => {
-    bullet.x += bulletSpeed * Math.cos(bullet.angle);
-    bullet.y += bulletSpeed * Math.sin(bullet.angle);
-    bullet.lifetime--;
-  });
+// Recebe informações sobre um novo jogador
+socket.on('newPlayer', (data) => {
+  players[data.playerId] = data.playerInfo;
+});
 
-  // Verifica colisões entre balas e jogadores
-  bullets.forEach((bullet, bulletIndex) => {
-    for (let playerId in players) {
-      if (bullet.ownerId === playerId) continue; // Ignora colisão com o jogador que disparou
+// Atualiza a posição do jogador quando recebe do servidor
+socket.on('playerMoved', (data) => {
+  if (data.playerId !== socket.id && players[data.playerId]) {
+    players[data.playerId].x = data.playerInfo.x;
+    players[data.playerId].y = data.playerInfo.y;
+    players[data.playerId].health = data.playerInfo.health;
+  }
+});
 
-      const player = players[playerId];
-      const dx = bullet.x - player.x;
-      const dy = bullet.y - player.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+// Remove um jogador desconectado
+socket.on('disconnect', (playerId) => {
+  delete players[playerId];
+});
 
-      if (distance < playerRadius + bulletRadius) {
-        player.health -= 20; // Reduz a saúde do jogador atingido
-        bullets.splice(bulletIndex, 1); // Remove a bala após a colisão
-        io.emit('bulletHit', { bulletIndex, playerId, health: player.health });
+// Recebe a lista de balas atuais
+socket.on('currentBullets', (currentBullets) => {
+  bullets = currentBullets;
+});
 
-        if (player.health <= 0) {
-          io.emit('playerDied', playerId);
-          delete players[playerId];
-        }
+// Adiciona uma nova bala ao jogo
+socket.on('newBullet', (bulletData) => {
+  bullets.push(bulletData);
+});
 
-        break;
-      }
-    }
-  });
+// Atualiza a saúde do jogador quando atingido
+socket.on('bulletHit', (data) => {
+  bullets.splice(data.bulletIndex, 1);
+  if (players[data.playerId]) {
+    players[data.playerId].health = data.health;
+  }
+});
 
-  // Remove balas que estão fora da tela ou atingiram o tempo de vida
-  bullets = bullets.filter(bullet =>
-    bullet.x >= 0 && bullet.x <= mapWidth &&
-    bullet.y >= 0 && bullet.y <= mapHeight &&
-    bullet.lifetime > 0
-  );
+// Remove um jogador que morreu
+socket.on('playerDied', (playerId) => {
+  if (playerId === socket.id) {
+    setTimeout(() => {
+      respawnButton.style.display = 'block';
+    }, 3000);
+  }
+  delete players[playerId];
+});
 
-  io.emit('updateBullets', bullets);
+// Atualiza a lista de balas
+socket.on('updateBullets', (updatedBullets) => {
+  bullets = updatedBullets;
+});
+
+// Flags de movimento
+let moveUp = false;
+let moveDown = false;
+let moveLeft = false;
+let moveRight = false;
+let lastPosition = { x: 0, y: 0 };
+let mouseX = 0;
+let mouseY = 0;
+
+// Controla as teclas pressionadas
+document.addEventListener('keydown', (event) => {
+  switch (event.key) {
+    case 'w':
+      moveUp = true;
+      break;
+    case 'a':
+      moveLeft = true;
+      break;
+    case 's':
+      moveDown = true;
+      break;
+    case 'd':
+      moveRight = true;
+      break;
+  }
+});
+
+// Controla as teclas soltas
+document.addEventListener('keyup', (event) => {
+  switch (event.key) {
+    case 'w':
+      moveUp = false;
+      break;
+    case 'a':
+      moveLeft = false;
+      break;
+    case 's':
+      moveDown = false;
+      break;
+    case 'd':
+      moveRight = false;
+      break;
+  }
+});
+
+// Atualiza a posição do mouse
+document.addEventListener('mousemove', (event) => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = event.clientX - rect.left;
+  mouseY = event.clientY - rect.top;
+});
+
+// Atira uma bala quando o mouse é clicado
+document.addEventListener('click', (event) => {
+  if (players[socket.id]) {
+    const angle = Math.atan2(mouseY - players[socket.id].y, mouseX - players[socket.id].x);
+    const bullet = {
+      x: players[socket.id].x,
+      y: players[socket.id].y,
+      angle: angle,
+      speed: 10,
+      ownerId: socket.id
+    };
+    bullets.push(bullet);
+    socket.emit('shootBullet', bullet);
+  }
+});
+
+// Renasce o jogador
+respawnButton.addEventListener('click', () => {
+  socket.emit('respawn');
+  respawnButton.style.display = 'none';
+});
+
+// Desenha a seta que aponta para a posição do mouse
+function drawPointer(context, player) {
+  const arrowLength = 15; // Comprimento da seta
+  const headLength = 5; // Comprimento da cabeça da seta
+  const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+
+  // Ponto inicial da seta
+  const fromX = player.x;
+  const fromY = player.y;
+
+  // Ponto final da seta
+  const toX = fromX + arrowLength * Math.cos(angle);
+  const toY = fromY + arrowLength * Math.sin(angle);
+
+  // Desenha a linha da seta
+  context.beginPath();
+  context.moveTo(fromX, fromY);
+  context.lineTo(toX, toY);
+  context.strokeStyle = 'blue'; // Cor da seta
+  context.lineWidth = 2; // Espessura da linha
+  context.stroke();
+
+  // Cabeça da seta
+  context.beginPath();
+  context.moveTo(toX, toY);
+  context.lineTo(toX - headLength * Math.cos(angle - Math.PI / 6), toY - headLength * Math.sin(angle - Math.PI / 6));
+  context.moveTo(toX, toY);
+  context.lineTo(toX - headLength * Math.cos(angle + Math.PI / 6), toY - headLength * Math.sin(angle + Math.PI / 6));
+  context.stroke();
 }
 
-setInterval(gameLoop, 1000 / 60); // Executa o loop do jogo a 60 FPS
+// Loop principal do jogo
+function gameLoop() {
+  if (players[socket.id]) {
+    let moved = false;
 
-// Altere esta parte para usar a variável de ambiente PORT
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(Listening on port ${PORT});
-});
+    // Atualiza a posição do jogador
+    if (moveUp) {
+      players[socket.id].y -= playerSpeed;
+      moved = true;
+    }
+    if (moveDown) {
+      players[socket.id].y += playerSpeed;
+      moved = true;
+    }
+    if (moveLeft) {
+      players[socket.id].x -= playerSpeed;
+      moved = true;
+    }
+    if (moveRight) {
+      players[socket.id].x += playerSpeed;
+      moved = true;
+    }
+
+    // Limita o movimento dentro dos limites do mapa
+    players[socket.id].x = Math.max(10, Math.min(players[socket.id].x, mapWidth - 10));
+    players[socket.id].y = Math.max(10, Math.min(players[socket.id].y, mapHeight - 10));
+
+    // Envia a nova posição para o servidor apenas se o jogador se moveu
+    if (moved && (players[socket.id].x !== lastPosition.x || players[socket.id].y !== lastPosition.y)) {
+      socket.emit('playerMovement', { 
+        x: players[socket.id].x, 
+        y: players[socket.id].y, 
+        health: players[socket.id].health 
+      });
+      lastPosition = { x: players[socket.id].x, y: players[socket.id].y }; 
+    }
+  }
+
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Renderiza os jogadores
+  for (let id in players) {
+    const player = players[id];
+    context.fillStyle = 'black';
+    context.beginPath();
+    context.arc(player.x, player.y, 10, 0, 2 * Math.PI);
+    context.fill();
+    context.fillStyle = 'red';
+    context.fillText(player.health, player.x - 10, player.y - 15); // Renderiza a saúde acima do jogador
+
+    // Desenha a seta de direção apenas para o jogador controlado
+    if (id === socket.id) {
+      drawPointer(context, player);
+    }
+  }
+
+  // Renderiza as balas
+  bullets.forEach(bullet => {
+    context.fillStyle = 'red';
+    context.beginPath();
+    context.arc(bullet.x, bullet.y, 5, 0, 2 * Math.PI);
+    context.fill();
+
+    // Atualiza a posição da bala em tempo real
+    bullet.x += bullet.speed * Math.cos(bullet.angle);
+    bullet.y += bullet.speed * Math.sin(bullet.angle);
+  });
+
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
