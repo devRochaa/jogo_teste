@@ -33,6 +33,7 @@ io.on('connection', (socket) => {
   // Adiciona novo jogador
   addNewPlayer(socket);
 
+  // Envia a lista atual de jogadores e balas para o novo jogador
   socket.emit('currentPlayers', players);
   socket.emit('currentBullets', bullets);
   socket.broadcast.emit('newPlayer', { playerId: socket.id, playerInfo: players[socket.id] });
