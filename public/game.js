@@ -20,7 +20,8 @@ socket.on('newPlayer', (data) => {
 
 socket.on('playerMoved', (data) => {
   if (players[data.playerId]) {
-    players[data.playerId] = data.playerInfo;
+    players[data.playerId].x = data.playerInfo.x;
+    players[data.playerId].y = data.playerInfo.y;
   }
 });
 
@@ -61,6 +62,7 @@ let moveDown = false;
 let moveLeft = false;
 let moveRight = false;
 
+// Captura de teclas para movimentação
 document.addEventListener('keydown', (event) => {
   switch (event.key) {
     case 'w':
@@ -101,6 +103,7 @@ document.addEventListener('click', (event) => {
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
     const angle = Math.atan2(mouseY - players[socket.id].y, mouseX - players[socket.id].x);
+    
     const bullet = {
       x: players[socket.id].x,
       y: players[socket.id].y,
@@ -108,6 +111,7 @@ document.addEventListener('click', (event) => {
       speed: 10,
       ownerId: socket.id
     };
+    
     bullets.push(bullet);
     socket.emit('shootBullet', bullet);
   }
@@ -118,6 +122,15 @@ respawnButton.addEventListener('click', () => {
   respawnButton.style.display = 'none';
 });
 
+// Função para atualizar a posição das balas
+function updateBullets() {
+  bullets.forEach(bullet => {
+    bullet.x += bullet.speed * Math.cos(bullet.angle);
+    bullet.y += bullet.speed * Math.sin(bullet.angle);
+  });
+}
+
+// Função principal do jogo
 function gameLoop() {
   if (players[socket.id]) { // Verifica se o jogador existe antes de movimentar
     if (moveUp) {
@@ -134,8 +147,8 @@ function gameLoop() {
     }
 
     // Limita o movimento dentro dos limites do mapa
-    players[socket.id].x = Math.max(0, Math.min(players[socket.id].x, mapWidth));
-    players[socket.id].y = Math.max(0, Math.min(players[socket.id].y, mapHeight));
+    players[socket.id].x = Math.max(10, Math.min(players[socket.id].x, mapWidth - 10));
+    players[socket.id].y = Math.max(10, Math.min(players[socket.id].y, mapHeight - 10));
 
     socket.emit('playerMovement', players[socket.id]);
   }
@@ -153,7 +166,8 @@ function gameLoop() {
     context.fillText(player.health, player.x - 10, player.y - 15); // Renderiza a saúde acima do jogador
   }
 
-  // Renderiza as balas
+  // Atualiza e renderiza as balas
+  updateBullets();
   bullets.forEach(bullet => {
     context.fillStyle = 'red';
     context.beginPath();
