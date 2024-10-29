@@ -131,8 +131,7 @@ document.addEventListener('click', (event) => {
       speed: 10,
       ownerId: socket.id
     };
-    bullets.push(bullet);
-    socket.emit('shootBullet', bullet);
+    socket.emit('shootBullet', bullet); // Envia a bala para o servidor
   }
 });
 
@@ -235,10 +234,6 @@ function gameLoop() {
     context.beginPath();
     context.arc(bullet.x, bullet.y, 5, 0, 2 * Math.PI);
     context.fill();
-
-    // Atualiza a posição da bala em tempo real
-    bullet.x += bullet.speed * Math.cos(bullet.angle);
-    bullet.y += bullet.speed * Math.sin(bullet.angle);
   });
 
   requestAnimationFrame(gameLoop);
