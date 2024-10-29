@@ -12,20 +12,24 @@ const respawnButton = document.getElementById('respawnButton');
 
 socket.on('currentPlayers', (currentPlayers) => {
   players = currentPlayers;
+  console.log('Current Players:', players); // Log dos jogadores atuais
 });
 
 socket.on('newPlayer', (data) => {
   players[data.playerId] = data.playerInfo;
+  console.log('New Player:', data); // Log de novo jogador
 });
 
 socket.on('playerMoved', (data) => {
   if (players[data.playerId]) {
     players[data.playerId] = data.playerInfo;
+    console.log('Player Moved:', data); // Log de movimento de jogador
   }
 });
 
 socket.on('disconnect', (playerId) => {
   delete players[playerId];
+  console.log('Player Disconnected:', playerId); // Log de desconexão
 });
 
 socket.on('currentBullets', (currentBullets) => {
@@ -140,6 +144,7 @@ function gameLoop() {
 
     // Envia a nova posição para o servidor
     socket.emit('playerMovement', players[socket.id]);
+    console.log('Player Movement Sent:', players[socket.id]); // Log de movimento enviado
   }
 
   context.clearRect(0, 0, canvas.width, canvas.height);
