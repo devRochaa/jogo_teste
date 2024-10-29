@@ -23,7 +23,6 @@ socket.on('newPlayer', (data) => {
 
 // Atualiza a posição do jogador quando recebe do servidor
 socket.on('playerMoved', (data) => {
-  // Não atualiza a posição do jogador local se for o próprio jogador
   if (data.playerId !== socket.id && players[data.playerId]) {
     players[data.playerId].x = data.playerInfo.x;
     players[data.playerId].y = data.playerInfo.y;
@@ -75,6 +74,8 @@ let moveDown = false;
 let moveLeft = false;
 let moveRight = false;
 let lastPosition = { x: 0, y: 0 };
+let mouseX = 0;
+let mouseY = 0;
 
 // Controla as teclas pressionadas
 document.addEventListener('keydown', (event) => {
@@ -112,12 +113,16 @@ document.addEventListener('keyup', (event) => {
   }
 });
 
+// Atualiza a posição do mouse
+document.addEventListener('mousemove', (event) => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = event.clientX - rect.left;
+  mouseY = event.clientY - rect.top;
+});
+
 // Atira uma bala quando o mouse é clicado
 document.addEventListener('click', (event) => {
   if (players[socket.id]) {
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
     const angle = Math.atan2(mouseY - players[socket.id].y, mouseX - players[socket.id].x);
     const bullet = {
       x: players[socket.id].x,
@@ -136,6 +141,21 @@ respawnButton.addEventListener('click', () => {
   socket.emit('respawn');
   respawnButton.style.display = 'none';
 });
+
+// Desenha a seta
+function drawArrow(context, fromX, fromY, toX, toY) {
+  const headlen = 10; // Tamanho da cabeça da seta
+  const angle = Math.atan2(toY - fromY, toX - fromX);
+  context.beginPath();
+  context.moveTo(fromX, fromY);
+  context.lineTo(toX, toY);
+  context.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+  context.moveTo(toX, toY);
+  context.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+  context.strokeStyle = 'blue'; // Cor da seta
+  context.lineWidth = 2; // Espessura da linha
+  context.stroke();
+}
 
 // Loop principal do jogo
 function gameLoop() {
@@ -186,6 +206,9 @@ function gameLoop() {
     context.fill();
     context.fillStyle = 'red';
     context.fillText(player.health, player.x - 10, player.y - 15); // Renderiza a saúde acima do jogador
+
+    // Desenha a seta apontando para a posição do mouse
+    drawArrow(context, player.x, player.y, mouseX, mouseY);
   }
 
   // Renderiza as balas
@@ -194,6 +217,10 @@ function gameLoop() {
     context.beginPath();
     context.arc(bullet.x, bullet.y, 5, 0, 2 * Math.PI);
     context.fill();
+
+    // Atualiza a posição da bala em tempo real
+    bullet.x += bullet.speed * Math.cos(bullet.angle);
+    bullet.y += bullet.speed * Math.sin(bullet.angle);
   });
 
   requestAnimationFrame(gameLoop);
